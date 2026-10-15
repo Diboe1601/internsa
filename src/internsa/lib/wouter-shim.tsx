@@ -30,7 +30,7 @@ type LinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
 
 export function Link({ href, children, ...rest }: LinkProps) {
   return (
-    <TanStackLink to={href} {...rest}>
+    <TanStackLink to={href} {...(rest as Record<string, unknown>)}>
       {children}
     </TanStackLink>
   );
@@ -40,18 +40,20 @@ export function Router({ children }: { children?: ReactNode; base?: string }) {
   return <>{children}</>;
 }
 
-type Params = Record<string, string>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Params = any;
 
-function matchPath(pattern: string, pathname: string): Params | null {
+function matchPath(pattern: string, pathname: string): Record<string, string> | null {
   const patternParts = pattern.split("/").filter(Boolean);
   const pathParts = pathname.split("/").filter(Boolean);
   if (patternParts.length !== pathParts.length) return null;
-  const params: Params = {};
+  const params: Record<string, string> = {};
   for (let i = 0; i < patternParts.length; i++) {
-    const p = patternParts[i];
+    const p = patternParts[i]!;
+    const segment = pathParts[i]!;
     if (p.startsWith(":")) {
-      params[p.slice(1)] = decodeURIComponent(pathParts[i]);
-    } else if (p !== pathParts[i]) {
+      params[p.slice(1)] = decodeURIComponent(segment);
+    } else if (p !== segment) {
       return null;
     }
   }
