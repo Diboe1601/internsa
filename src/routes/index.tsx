@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { InternSAApp } from "@/internsa/App.client";
+import { InternSAApp } from "@/internsa/InternSAApp";
 
 export const Route = createFileRoute("/")({
   head: () => ({
