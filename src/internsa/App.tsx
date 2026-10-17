@@ -124,11 +124,13 @@ function AdminSidebar({path}:{path:string}) {
 }
 function BottomNav({path}:{path:string}) {
  const [,setLocation]=useLocation();
+ const isHome=path==='/';
+ const links=isHome?navLinks.filter(({href})=>href!=='/profile'):navLinks;
  return <nav className="bottom-nav" aria-label="Student dashboard navigation">
-  {navLinks.map(({href,label,icon:Icon})=><Link key={href} href={href} className={path===href?'active':''} data-testid={`mobile-nav-${label.toLowerCase()}`}><Icon size={17}/><span>{label}</span></Link>)}
+  {links.map(({href,label,icon:Icon})=><Link key={href} href={href} className={path===href?'active':''} data-testid={`mobile-nav-${label.toLowerCase()}`}><Icon size={17}/><span>{label}</span></Link>)}
   <Link href="/login" data-testid="mobile-nav-login"><ArrowLeft size={17}/><span>Log in</span></Link>
-  <Link href="/signup" data-testid="mobile-nav-signup"><Plus size={17}/><span>Sign up</span></Link>
-  <button type="button" onClick={()=>setLocation('/login')} data-testid="button-student-mobile-logout"><LogOut size={17}/><span>Log out</span></button>
+   <Link href="/signup" data-testid="mobile-nav-signup"><Plus size={17}/><span>Sign up</span></Link>
+  {isHome?null:<button type="button" onClick={()=>setLocation('/login')} data-testid="button-student-mobile-logout"><LogOut size={17}/><span>Log out</span></button>}
  </nav>
 }
 function AdminNav({path}:{path:string}) {
