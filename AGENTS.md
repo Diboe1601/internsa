@@ -8,3 +8,5 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Render desktop dashboard sidebars only in the shared AppShell, using the same grid for student and admin pages; page-level sidebars cause inconsistent alignment and duplication.
