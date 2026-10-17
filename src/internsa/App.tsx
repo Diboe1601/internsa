@@ -60,7 +60,7 @@ function AppShell() {
       </Switch>
     </>:<>
       <div className={`dashboard-shell ${isAdmin?'admin-dashboard-shell':'student-dashboard-shell'}`}>
-        {isAdmin?<AdminSidebar path={location}/>:<StudentSidebar path={location}/>}
+        {isAdmin?(location==='/admin/profile'?<AdminSidebar path={location}/>:null):<StudentSidebar path={location}/>}
         <div className="dashboard-main">
           <Switch>
             <Route path="/">{()=><Home {...ctx}/>}</Route>
