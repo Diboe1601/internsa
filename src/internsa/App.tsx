@@ -92,15 +92,17 @@ function Heading({eyebrow,title,sub,action}:{eyebrow:string;title:string;sub?:st
 function DashboardBrand({href}:{href:string}) {return <Link href={href} className="dashboard-brand" data-testid="link-dashboard-brand"><span className="brand-mark">i</span><span className="brand-word">internsa<small>YOUR NEXT STEP</small></span></Link>}
 function StudentSidebar({path}:{path:string}) {
  const [,setLocation]=useLocation();
+ const isHome=path==='/';
+ const links=isHome?navLinks.filter(({href})=>href!=='/profile'):navLinks;
  return <aside className="admin-side dashboard-side student-side" aria-label="Student dashboard sidebar">
   <DashboardBrand href="/"/>
   <p>Student workspace</p>
   <nav className="sidebar-links" aria-label="Student dashboard">
-   {navLinks.map(({href,label,icon:Icon})=><Link key={href} href={href} className={path===href?'active':''} data-testid={`student-nav-${label.toLowerCase()}`}><Icon size={16}/>{label}</Link>)}
+   {links.map(({href,label,icon:Icon})=><Link key={href} href={href} className={path===href?'active':''} data-testid={`student-nav-${label.toLowerCase()}`}><Icon size={16}/>{label}</Link>)}
   </nav>
   <div className="sidebar-footer">
    <div className="sidebar-account-links"><Link href="/login" data-testid="sidebar-student-login">Log in</Link><Link href="/signup" data-testid="sidebar-student-signup">Create account</Link></div>
-   <button className="sidebar-logout" type="button" onClick={()=>setLocation('/login')} data-testid="button-student-logout"><LogOut size={15}/>Log out</button>
+   {isHome?null:<button className="sidebar-logout" type="button" onClick={()=>setLocation('/login')} data-testid="button-student-logout"><LogOut size={15}/>Log out</button>}
    <span className="sidebar-demo-note">Demo navigation only. Authentication is not connected.</span>
   </div>
  </aside>
