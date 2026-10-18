@@ -14,7 +14,7 @@ import NotFound from '@/internsa/pages/not-found';
 import { StudentLoginPage, StudentSignupPage } from '@/internsa/pages/auth';
 
 const navLinks = [
-  { href:'/', label:'Home', icon:House }, {href:'/explore',label:'Explore',icon:Search},
+  { href:'/', label:'Home', icon:House }, {href:'/dashboard',label:'Dashboard',icon:LayoutDashboard}, {href:'/explore',label:'Explore',icon:Search},
   {href:'/saved',label:'Saved',icon:Bookmark}, {href:'/guides',label:'Guides',icon:BookOpen},
   {href:'/profile',label:'Profile',icon:UserRound},
 ];
@@ -64,6 +64,7 @@ function AppShell() {
         <div className="dashboard-main">
           <Switch>
             <Route path="/">{()=><Home {...ctx}/>}</Route>
+            <Route path="/dashboard">{()=><StudentDashboard {...ctx}/>}</Route>
             <Route path="/explore">{()=><Explore {...ctx}/>}</Route>
             <Route path="/saved">{()=><Saved {...ctx}/>}</Route>
             <Route path="/guides">{()=><Guides {...ctx}/>}</Route>
@@ -166,6 +167,31 @@ function Home(ctx:Context) {
  </main>
 }
 
+function StudentDashboard(ctx:Context) {
+ const [,setLocation]=useLocation();
+ const [search,setSearch]=useState('');
+ const live=ctx.store.opportunities.filter(isLive);
+ const closingWeek=live.filter(o=>daysUntil(o.closingDate)<=7);
+ const closing=[...live].sort((a,b)=>a.closingDate.localeCompare(b.closingDate)).slice(0,3);
+ const guides=ctx.store.guides.filter(g=>g.status==='published');
+ const name=ctx.store.profile.name?.split(' ')[0]||'career explorer';
+ const submit=(e:FormEvent)=>{e.preventDefault();ctx.track('search',{term:search});setLocation('/explore?q='+encodeURIComponent(search))};
+ const stats=[
+  {label:'Saved opportunities',value:ctx.store.savedIds.length,href:'/saved',cta:'View saved',icon:Bookmark,dark:true},
+  {label:'Live opportunities',value:live.length,href:'/explore',cta:'Explore all',icon:BriefcaseBusiness},
+  {label:'Closing this week',value:closingWeek.length,href:'/explore',cta:'Find opportunities',icon:ActivityIcon},
+  {label:'Career guides',value:guides.length,href:'/guides',cta:'Browse guides',icon:BookOpen},
+ ];
+ return <main className="content" data-testid="page-student-dashboard">
+  <section className="sd-welcome"><p className="eyebrow">Your next chapter</p><h1>Welcome, {name}.</h1><p className="sd-lead">Your future is full of opportunities.</p><p>Explore internships, bursaries, learnerships and graduate programmes across South Africa.</p>
+   <form className="sd-search" onSubmit={submit}><Search size={16}/><input aria-label="Search opportunities" placeholder="Search opportunities..." value={search} onChange={e=>setSearch(e.target.value)} data-testid="input-dashboard-search"/><button className="button primary small" type="submit" aria-label="Search" data-testid="button-dashboard-search"><ArrowRight size={15}/></button></form>
+  </section>
+  <section className="sd-stats">{stats.map(({label,value,href,cta,icon:Icon,dark})=><article key={label} className={`sd-stat${dark?' dark':''}`} data-testid={`stat-${label.toLowerCase().replaceAll(' ','-')}`}><span className="sd-stat-icon"><Icon size={17}/></span><p>{label}</p><strong>{value}</strong><Link href={href} className="text-link">{cta} <ArrowRight size={13}/></Link></article>)}</section>
+  <section className="section-block"><div className="section-top"><div><h2>Closing soon</h2><p>Don't miss these deadlines.</p></div><Link href="/explore" className="text-link">View all <ArrowRight size={13}/></Link></div><OpportunityGrid items={closing} empty="No currently published samples."/></section>
+  <section className="section-block"><div className="section-top"><div><h2>Career guides</h2><p>Prepare for your next step.</p></div><Link href="/guides" className="text-link">All guides <ArrowRight size={13}/></Link></div><div className="quick-pills">{guides.slice(0,4).map(g=><Link key={g.id} href="/guides" className="pill"><BookOpen size={13}/> {g.title}</Link>)}</div></section>
+  <section className="section-block notice warning"><ShieldCheck size={14}/> Sample opportunities, not live vacancies. Always verify on the organisation's official website. InternSA never charges application fees.</section>
+ </main>
+}
 function Explore(ctx:Context) {
  const queryFromUrl=new URLSearchParams(window.location.search);
  const [query,setQuery]=useState(queryFromUrl.get('q')||'');
