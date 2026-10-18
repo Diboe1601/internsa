@@ -305,3 +305,5 @@
 .sd-stat .text-link{margin-top:auto}
 .sd-stats .sd-stat{min-width:0}
 .content .quick-pills .pill{display:inline-flex;align-items:center;gap:6px}
+.profile-section{font-family:Newsreader,serif;font-size:18px;margin:22px 0 12px;color:#282d28}
+.profile-section:first-of-type{margin-top:0}

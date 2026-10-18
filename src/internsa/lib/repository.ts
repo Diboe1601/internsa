@@ -13,9 +13,11 @@ export type Guide = {
 };
 export type ApplyIntent = { id: string; opportunityId: string; createdAt: string };
 export type Report = { id: string; opportunityId: string; reason: string; details: string; createdAt: string; status: 'open' | 'resolved' };
-export type Profile = { name: string; province: string; qualification: string; interests: string[] };
+export type Profile = { name: string; province: string; qualification: string; interests: string[]; email?: string; phone?: string; institution?: string; fieldOfStudy?: string; graduationYear?: string; goal?: string; cvUrl?: string; linkedinUrl?: string; workPreference?: string };
+export type AdminProfile = { name: string; email: string; phone: string; jobTitle: string; department: string; organisation: string; notifyReports: boolean; notifyClosing: boolean; weeklySummary: boolean };
+export const defaultAdminProfile: AdminProfile = { name:'', email:'', phone:'', jobTitle:'Content administrator', department:'Opportunities & partnerships', organisation:'InternSA', notifyReports:true, notifyClosing:true, weeklySummary:false };
 export type Activity = { id: string; kind: 'view' | 'search' | 'save' | 'apply' | 'report' | 'share'; opportunityId?: string; term?: string; createdAt: string };
-export type Store = { version: number; opportunities: Opportunity[]; guides: Guide[]; applyIntents: ApplyIntent[]; savedIds: string[]; reports: Report[]; profile: Profile; activity: Activity[] };
+export type Store = { version: number; opportunities: Opportunity[]; guides: Guide[]; applyIntents: ApplyIntent[]; savedIds: string[]; reports: Report[]; profile: Profile; activity: Activity[]; adminProfile?: AdminProfile };
 
 const KEY = 'internsa.demo.v1';
 const formatDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
