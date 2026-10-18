@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { Link } from '@/internsa/lib/wouter-shim';
+import { Link, useLocation } from '@/internsa/lib/wouter-shim';
 import { ArrowRight, GraduationCap, ShieldCheck, UserRound, type LucideIcon } from 'lucide-react';
 
 function useAuthPageMeta(title: string, description: string) {
@@ -133,13 +133,14 @@ export function StudentSignupPage() {
 }
 
 export function StudentLoginPage() {
-  const [message, setMessage] = useState('');
+  const [message] = useState('');
+  const [, setLocation] = useLocation();
   const description = 'Students, job seekers, and administrators use this same login page. Authentication is not connected in this prototype, so credentials are not verified or stored.';
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     event.currentTarget.reset();
-    setMessage('Login is not connected yet. No account was authenticated, and your credentials were not saved or sent.');
+    setLocation('/dashboard');
   }
 
   return (
@@ -159,7 +160,7 @@ export function StudentLoginPage() {
         <AuthFeedback message={message} />
       </form>
       <p className="auth-switch">New student or job seeker? <Link href="/signup" data-testid="link-login-signup">Create a student account</Link></p>
-      <Link className="text-link auth-admin-preview" href="/" data-testid="link-student-preview">Open the unprotected students demo <ArrowRight size={13} aria-hidden="true" /></Link>
+      <Link className="text-link auth-admin-preview" href="/dashboard" data-testid="link-student-preview">Open the unprotected students demo <ArrowRight size={13} aria-hidden="true" /></Link>
       <p className="auth-admin-note">Admins use this same login. Admin accounts cannot be created here.</p>
       <Link className="text-link auth-admin-preview" href="/admin" data-testid="link-admin-preview">Open the unprotected admin demo <ArrowRight size={13} aria-hidden="true" /></Link>
     </AuthFrame>
