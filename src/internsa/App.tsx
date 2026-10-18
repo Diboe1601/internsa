@@ -7,7 +7,7 @@ import {
   House, UserRound, LogOut,
 } from 'lucide-react';
 import {
-  type Activity, type Guide, type GuideStatus, type Opportunity, type Profile, type Report, type Store, emptyGuide, emptyOpportunity,
+  type Activity, type AdminProfile, defaultAdminProfile, type Guide, type GuideStatus, type Opportunity, type Profile, type Report, type Store, emptyGuide, emptyOpportunity,
   readStore, writeStore, makeId, provinces, types, daysUntil, isLive,
 } from '@/internsa/lib/repository';
 import NotFound from '@/internsa/pages/not-found';
@@ -18,6 +18,13 @@ const navLinks = [
   {href:'/saved',label:'Saved',icon:Bookmark}, {href:'/guides',label:'Guides',icon:BookOpen},
   {href:'/profile',label:'Profile',icon:UserRound},
 ];
+const publicLinks=[{ href:'/', label:'Home', icon:House },{href:'/explore',label:'Explore',icon:Search},{href:'/guides',label:'Guides',icon:BookOpen}];
+const studentLinks=[
+  {href:'/dashboard',label:'Dashboard',icon:LayoutDashboard},{href:'/explore',label:'Explore',icon:Search},
+  {href:'/saved',label:'Saved',icon:Bookmark},{href:'/applications',label:'Applications',icon:BriefcaseBusiness},
+  {href:'/guides',label:'Career guides',icon:BookOpen},{href:'/profile',label:'Profile',icon:UserRound},
+];
+const linksFor=(path:string)=>path==='/'?publicLinks:studentLinks;
 const adminLinks = [
   {href:'/admin',label:'Overview',icon:LayoutDashboard},{href:'/admin/opportunities',label:'Opportunities',icon:BriefcaseBusiness},
   {href:'/admin/guides',label:'Guides',icon:BookOpen},
@@ -65,6 +72,7 @@ function AppShell() {
           <Switch>
             <Route path="/">{()=><Home {...ctx}/>}</Route>
             <Route path="/dashboard">{()=><StudentDashboard {...ctx}/>}</Route>
+            <Route path="/applications">{()=><Applications {...ctx}/>}</Route>
             <Route path="/explore">{()=><Explore {...ctx}/>}</Route>
             <Route path="/saved">{()=><Saved {...ctx}/>}</Route>
             <Route path="/guides">{()=><Guides {...ctx}/>}</Route>
@@ -75,7 +83,7 @@ function AppShell() {
             <Route path="/admin/guides">{()=><AdminGuides {...ctx}/>}</Route>
             <Route path="/admin/reports">{()=><AdminReports {...ctx}/>}</Route>
             <Route path="/admin/analytics">{()=><AdminAnalytics {...ctx}/>}</Route>
-            <Route path="/admin/profile">{()=><ProfilePage {...ctx}/>}</Route>
+            <Route path="/admin/profile">{()=><AdminProfilePage {...ctx}/>}</Route>
             <Route><NotFound/></Route>
           </Switch>
         </div>
@@ -92,12 +100,12 @@ function Heading({eyebrow,title,sub,action}:{eyebrow:string;title:string;sub?:st
 }
 function DashboardBrand({href}:{href:string}) {return <Link href={href} className="dashboard-brand" data-testid="link-dashboard-brand"><span className="brand-mark">i</span><span className="brand-word">internsa<small>YOUR NEXT STEP</small></span></Link>}
 function StudentSidebar({path}:{path:string}) {
- const links=navLinks.filter(({href})=>href!=='/profile');
+ const links=linksFor(path);
  return <aside className="admin-side dashboard-side student-side" aria-label="Student dashboard sidebar">
   <DashboardBrand href="/"/>
   <p>Student workspace</p>
   <nav className="sidebar-links" aria-label="Student dashboard">
-   {links.map(({href,label,icon:Icon})=><Link key={href} href={href} className={path===href?'active':''} data-testid={`student-nav-${label.toLowerCase()}`}><Icon size={16}/>{label}</Link>)}
+   {links.map(({href,label,icon:Icon})=><Link key={href} href={href} className={path===href?'active':''} data-testid={`student-nav-${label.toLowerCase().replaceAll(' ','-')}`}><Icon size={16}/>{label}</Link>)}
   </nav>
   <div className="sidebar-footer">
    <div className="sidebar-account-links"><Link href="/login" data-testid="sidebar-student-login">Log in</Link><Link href="/signup" data-testid="sidebar-student-signup">Create account</Link></div>
@@ -121,7 +129,7 @@ function AdminSidebar({path}:{path:string}) {
  </aside>
 }
 function BottomNav({path}:{path:string}) {
- const links=navLinks.filter(({href})=>href!=='/profile');
+ const links=linksFor(path);
  return <nav className="bottom-nav" aria-label="Student dashboard navigation">
   {links.map(({href,label,icon:Icon})=><Link key={href} href={href} className={path===href?'active':''} data-testid={`mobile-nav-${label.toLowerCase()}`}><Icon size={17}/><span>{label}</span></Link>)}
   <Link href="/login" data-testid="mobile-nav-login"><ArrowLeft size={17}/><span>Log in</span></Link>
@@ -254,15 +262,69 @@ function Detail({id,...ctx}:{id:string}&Context) {
 function Dialog({title,children,close}:{title:string;children:ReactNode;close:()=>void}) {return <div className="dialog-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><section className="dialog-card" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><div className="dialog-head"><h2 id="dialog-title">{title}</h2><button className="dialog-close" onClick={close} aria-label="Close dialog" data-testid="button-close-dialog"><X size={16}/></button></div>{children}</section></div>}
 
 function ProfilePage({store,setStore,announce}:Context) {
- const [name,setName]=useState(store.profile.name),[province,setProvince]=useState(store.profile.province),[qualification,setQualification]=useState(store.profile.qualification),[interests,setInterests]=useState(store.profile.interests);
- const save=(e:FormEvent)=>{e.preventDefault();const profile:Profile={name,province,qualification,interests};setStore(s=>({...s,profile}));announce('Demo preferences saved on this device.');};
+ const [p,setP]=useState<Profile>(store.profile);
+ const set=(k:keyof Profile)=>(e:{target:{value:string}})=>setP(v=>({...v,[k]:e.target.value}));
+ const save=(e:FormEvent)=>{e.preventDefault();setStore(s=>({...s,profile:p}));announce('Profile saved on this device.');};
  const choices=['Internship','Bursary','Learnership','Graduate programme','Entry-level job'];
- return <main className="content"><Heading eyebrow="Your preferences" title="Profile & fit" sub="No account or real personal details are needed. These preferences stay in local browser storage."/><form className="panel" onSubmit={save} style={{maxWidth:720}}><div className="notice" style={{marginBottom:18}}><strong>Local-only profile.</strong> You can use a nickname or leave the name empty. This is not a user account.</div><div className="form-grid">
- <div className="form-field"><label htmlFor="profile-name">Name or nickname (optional)</label><input className="field" id="profile-name" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. K." data-testid="input-profile-name"/></div>
- <div className="form-field"><label htmlFor="profile-province">Province</label><select id="profile-province" className="select" value={province} onChange={e=>setProvince(e.target.value)} data-testid="select-profile-province">{provinces.map(p=><option key={p}>{p}</option>)}</select></div>
- <div className="form-field full"><label htmlFor="profile-qualification">Current qualification / study level</label><input className="field" id="profile-qualification" value={qualification} onChange={e=>setQualification(e.target.value)} placeholder="Optional, e.g. Diploma student" data-testid="input-profile-qualification"/></div>
- <fieldset className="form-field full" style={{border:0,padding:0,margin:0}}><legend className="filter-label">Interests</legend><div className="quick-pills" style={{marginTop:0}}>{choices.map(c=><button type="button" key={c} className={`pill ${interests.includes(c)?'active':''}`} aria-pressed={interests.includes(c)} onClick={()=>setInterests(v=>v.includes(c)?v.filter(x=>x!==c):[...v,c])} data-testid={`toggle-interest-${c.toLowerCase().replaceAll(' ','-')}`}>{c}</button>)}</div></fieldset>
- </div><button className="button primary" type="submit" style={{marginTop:18}} data-testid="button-save-profile"><Check size={15}/>Save preferences</button></form></main>
+ const fields=[p.name,p.email,p.phone,p.institution,p.fieldOfStudy,p.qualification,p.goal,p.cvUrl];
+ const done=Math.round(fields.filter(Boolean).length/fields.length*100);
+ const F=({id,label,k,ph,type='text',full}:{id:string;label:string;k:keyof Profile;ph?:string;type?:string;full?:boolean})=><div className={`form-field${full?' full':''}`}><label htmlFor={id}>{label}</label><input className="field" id={id} type={type} value={(p[k] as string)||''} onChange={set(k)} placeholder={ph} data-testid={`input-${id}`}/></div>;
+ return <main className="content"><Heading eyebrow="Your profile" title="Profile & career details" sub="Keep your details current so opportunities match you better. Saved only in this browser."/>
+ <div className="notice" style={{marginBottom:18,maxWidth:760}}><strong>Profile {done}% complete.</strong> Add your study details, career goal and CV link to finish.</div>
+ <form className="panel" onSubmit={save} style={{maxWidth:760}}>
+  <h3 className="profile-section">Personal details</h3><div className="form-grid">
+   {F({id:'profile-name',label:'Full name',k:'name',ph:'Your name'})}{F({id:'profile-email',label:'Email address',k:'email',ph:'you@example.com',type:'email'})}
+   {F({id:'profile-phone',label:'Phone number',k:'phone',ph:'e.g. 071 234 5678',type:'tel'})}
+   <div className="form-field"><label htmlFor="profile-province">Province</label><select id="profile-province" className="select" value={p.province} onChange={set('province')} data-testid="select-profile-province">{provinces.map(x=><option key={x}>{x}</option>)}</select></div>
+  </div>
+  <h3 className="profile-section">Education</h3><div className="form-grid">
+   {F({id:'profile-institution',label:'Institution',k:'institution',ph:'e.g. University of Pretoria'})}{F({id:'profile-field',label:'Field of study',k:'fieldOfStudy',ph:'e.g. Computer Science'})}
+   {F({id:'profile-qualification',label:'Current qualification / study level',k:'qualification',ph:'e.g. Final-year diploma student'})}{F({id:'profile-grad',label:'Graduation year',k:'graduationYear',ph:'e.g. 2026'})}
+  </div>
+  <h3 className="profile-section">Career preferences</h3><div className="form-grid">
+   <div className="form-field full"><label htmlFor="profile-goal">Career goal</label><textarea className="field" id="profile-goal" rows={3} value={p.goal||''} onChange={set('goal')} placeholder="What kind of role are you working towards?" data-testid="input-profile-goal"/></div>
+   <div className="form-field"><label htmlFor="profile-work">Work preference</label><select id="profile-work" className="select" value={p.workPreference||'Any'} onChange={set('workPreference')}>{['Any','On-site','Hybrid','Remote'].map(x=><option key={x}>{x}</option>)}</select></div>
+   <div/>
+   <fieldset className="form-field full" style={{border:0,padding:0,margin:0}}><legend className="filter-label">Opportunity interests</legend><div className="quick-pills" style={{marginTop:0}}>{choices.map(c=><button type="button" key={c} className={`pill ${p.interests.includes(c)?'active':''}`} aria-pressed={p.interests.includes(c)} onClick={()=>setP(v=>({...v,interests:v.interests.includes(c)?v.interests.filter(x=>x!==c):[...v.interests,c]}))} data-testid={`toggle-interest-${c.toLowerCase().replaceAll(' ','-')}`}>{c}</button>)}</div></fieldset>
+  </div>
+  <h3 className="profile-section">CV & links</h3><div className="form-grid">
+   {F({id:'profile-cv',label:'CV link',k:'cvUrl',ph:'Link to your CV (Google Drive, etc.)',type:'url'})}{F({id:'profile-linkedin',label:'LinkedIn profile',k:'linkedinUrl',ph:'https://linkedin.com/in/...',type:'url'})}
+  </div>
+  <button className="button primary" type="submit" style={{marginTop:18}} data-testid="button-save-profile"><Check size={15}/>Save profile</button></form></main>
+}
+function AdminProfilePage({store,setStore,announce}:Context) {
+ const [p,setP]=useState<AdminProfile>(store.adminProfile??defaultAdminProfile);
+ const set=(k:keyof AdminProfile)=>(e:{target:{value:string}})=>setP(v=>({...v,[k]:e.target.value}));
+ const save=(e:FormEvent)=>{e.preventDefault();setStore(s=>({...s,adminProfile:p}));announce('Admin profile saved on this device.');};
+ const openReports=store.reports.filter(r=>r.status==='open').length, published=store.opportunities.filter(o=>o.status==='published').length;
+ const toggles:[keyof AdminProfile,string][]=[['notifyReports','Email me when a listing is reported'],['notifyClosing','Remind me about listings closing within 3 days'],['weeklySummary','Send a weekly activity summary']];
+ return <main className="content"><Heading eyebrow="Administrator" title="Admin profile & settings" sub="Your contact details, role and notification preferences. Saved only in this browser."/>
+ <div className="sd-stats" style={{maxWidth:760,gridTemplateColumns:'repeat(3,minmax(0,1fr))'}}>
+  <article className="sd-stat"><p>Published listings</p><strong>{published}</strong></article>
+  <article className="sd-stat"><p>Open reports</p><strong>{openReports}</strong></article>
+  <article className="sd-stat"><p>Published guides</p><strong>{store.guides.filter(g=>g.status==='published').length}</strong></article>
+ </div>
+ <form className="panel" onSubmit={save} style={{maxWidth:760}}>
+  <h3 className="profile-section">Contact details</h3><div className="form-grid">
+   <div className="form-field"><label htmlFor="admin-name">Full name</label><input className="field" id="admin-name" value={p.name} onChange={set('name')} placeholder="Your name" data-testid="input-admin-name"/></div>
+   <div className="form-field"><label htmlFor="admin-email">Work email</label><input className="field" id="admin-email" type="email" value={p.email} onChange={set('email')} placeholder="name@internsa.co.za" data-testid="input-admin-email"/></div>
+   <div className="form-field"><label htmlFor="admin-phone">Phone number</label><input className="field" id="admin-phone" type="tel" value={p.phone} onChange={set('phone')} placeholder="e.g. 011 123 4567"/></div>
+   <div className="form-field"><label htmlFor="admin-org">Organisation</label><input className="field" id="admin-org" value={p.organisation} onChange={set('organisation')}/></div>
+  </div>
+  <h3 className="profile-section">Role</h3><div className="form-grid">
+   <div className="form-field"><label htmlFor="admin-title">Job title</label><input className="field" id="admin-title" value={p.jobTitle} onChange={set('jobTitle')} data-testid="input-admin-title"/></div>
+   <div className="form-field"><label htmlFor="admin-dept">Department</label><select id="admin-dept" className="select" value={p.department} onChange={set('department')}>{['Opportunities & partnerships','Content & guides','Trust & safety','Operations'].map(x=><option key={x}>{x}</option>)}</select></div>
+  </div>
+  <h3 className="profile-section">Notifications</h3>
+  <div style={{display:'grid',gap:10}}>{toggles.map(([k,label])=><label key={k} style={{display:'flex',gap:10,alignItems:'center',fontSize:14}}><input type="checkbox" checked={p[k] as boolean} onChange={e=>setP(v=>({...v,[k]:e.target.checked}))} data-testid={`toggle-${k}`}/>{label}</label>)}</div>
+  <button className="button primary" type="submit" style={{marginTop:18}} data-testid="button-save-admin-profile"><Check size={15}/>Save settings</button></form></main>
+}
+function Applications({store}:Context) {
+ const items=store.applyIntents.map(a=>({a,o:store.opportunities.find(o=>o.id===a.opportunityId)})).filter(x=>x.o) as {a:{id:string;createdAt:string};o:Opportunity}[];
+ return <main className="content"><Heading eyebrow="Your applications" title="Application tracker" sub="Opportunities you've started applying for. Tracked only in this browser."/>
+  {items.length?<div className="panel" style={{display:'grid',gap:12}}>{items.map(({a,o})=><div key={a.id} className="section-top" style={{borderBottom:'1px solid #e3ddd0',paddingBottom:10}}><div><h3 style={{margin:0}}><Link href={`/opportunities/${o.id}`} className="text-link" style={{padding:0}}>{o.title}</Link></h3><p style={{margin:'2px 0 0',fontSize:12,color:'#77796f'}}>{o.organisation} · started {new Date(a.createdAt).toLocaleDateString('en-ZA')}</p></div><span className="tag">{daysUntil(o.closingDate)<0?'Closed':`Closes in ${daysUntil(o.closingDate)} days`}</span></div>)}</div>
+  :<div className="panel" style={{textAlign:'center',padding:34}}><BriefcaseBusiness size={24} color="#a4443b"/><h3 style={{fontFamily:'Newsreader',margin:'10px 0 4px'}}>No applications yet</h3><p style={{color:'#77796f',fontSize:12}}>When you start applying for an opportunity it will show up here.</p><Link href="/explore" className="button primary small">Explore opportunities <ArrowRight size={13}/></Link></div>}
+ </main>
 }
 function Guides({store}:Context) {
  const published=store.guides.filter(guide=>guide.status==='published');
