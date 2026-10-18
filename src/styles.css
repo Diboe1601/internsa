@@ -301,3 +301,7 @@
 .sd-stat.dark p,.sd-stat.dark strong,.sd-stat.dark .text-link{color:#f8f5ee}
 .sd-stat.dark .sd-stat-icon{background:rgba(248,245,238,.12);color:#f8f5ee}
 @media(max-width:900px){.sd-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.sd-stat .text-link,.content .section-top .text-link{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;padding:0}
+.sd-stat .text-link{margin-top:auto}
+.sd-stats .sd-stat{min-width:0}
+.content .quick-pills .pill{display:inline-flex;align-items:center;gap:6px}
