@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import {
   type Activity, type AdminProfile, defaultAdminProfile, type Guide, type GuideStatus, type Opportunity, type Profile, type Report, type Store, emptyGuide, emptyOpportunity,
-  readStore, writeStore, makeId, provinces, types, daysUntil, isLive,
+  readStore, writeStore, makeId, provinces, types, daysUntil, isLive, fetchOpportunities, fetchGuides,
 } from '@/internsa/lib/repository';
 import NotFound from '@/internsa/pages/not-found';
 import { StudentLoginPage, StudentSignupPage } from '@/internsa/pages/auth';
@@ -33,10 +33,43 @@ const adminLinks = [
   {href:'/admin/profile',label:'Profile',icon:UserRound},
 ];
 
+import { supabase } from '@/internsa/lib/supabase';
+
 function AppShell() {
   const [store,setStore] = useState<Store>(() => readStore());
   const [location,setLocation] = useLocation();
   const [toast,setToast] = useState('');
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    // Check current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    async function loadData() {
+      const [opps, guides] = await Promise.all([
+        fetchOpportunities(),
+        fetchGuides()
+      ]);
+      setStore(current => ({
+        ...current,
+        opportunities: opps.length > 0 ? opps : current.opportunities,
+        guides: guides.length > 0 ? guides : current.guides
+      }));
+    }
+    loadData();
+  }, []);
+
   useEffect(()=>writeStore(store),[store]);
   useEffect(()=>{
     const nowClosed=store.opportunities.filter(o=>o.status==='published'&&daysUntil(o.closingDate)<0).map(o=>o.id);
@@ -55,6 +88,11 @@ function AppShell() {
   const ctx={store,setStore,announce,track,toggleSave};
   const isAuthRoute=location==='/login'||location==='/signup'||location==='/admin/login';
   const isAdmin=location.startsWith('/admin')&&location!=='/admin/login';
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setLocation('/login');
+    announce('Logged out successfully.');
+  };
   return <div className="app-shell">
     {isAuthRoute?<>
       <header className="topbar auth-topbar">
@@ -67,8 +105,8 @@ function AppShell() {
         <Route><NotFound/></Route>
       </Switch>
     </>:<>
-      <div className={`dashboard-shell ${isAdmin?'admin-dashboard-shell':'student-dashboard-shell'}`}>
-        {isAdmin?<AdminSidebar path={location}/>:<StudentSidebar path={location}/>}
+     return <div className={`dashboard-shell ${isAdmin?'admin-dashboard-shell':'student-dashboard-shell'}`}>
+        {isAdmin?<AdminSidebar path={location} onLogout={handleLogout}/>:<StudentSidebar path={location} onLogout={handleLogout}/>}
         <div className="dashboard-main">
           <Switch>
             <Route path="/">{()=><Home {...ctx}/>}</Route>
@@ -100,34 +138,31 @@ function Heading({eyebrow,title,sub,action}:{eyebrow:string;title:string;sub?:st
  return <div className="page-heading"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1>{sub&&<p>{sub}</p>}</div>{action}</div>
 }
 function DashboardBrand({href}:{href:string}) {return <Link href={href} className="dashboard-brand" data-testid="link-dashboard-brand"><span className="brand-mark">i</span><span className="brand-word">internsa<small>YOUR NEXT STEP</small></span></Link>}
-function StudentSidebar({path}:{path:string}) {
+function StudentSidebar({path, onLogout}:{path:string; onLogout: () => void}) {
  const [,setLocation]=useLocation();
  const links=linksFor(path);
  return <aside className="admin-side dashboard-side student-side" aria-label="Student dashboard sidebar">
   <DashboardBrand href="/"/>
-  <p>Student workspace</p>
   <nav className="sidebar-links" aria-label="Student dashboard">
    {links.map(({href,label,icon:Icon})=><Link key={href} href={href} className={path===href?'active':''} data-testid={`student-nav-${label.toLowerCase().replaceAll(' ','-')}`}><Icon size={16}/>{label}</Link>)}
   </nav>
   {publicPaths.includes(path)?<div className="sidebar-footer">
    <div className="sidebar-account-links"><Link href="/login" data-testid="link-sidebar-login">Log in</Link><Link href="/signup" data-testid="link-sidebar-signup">Create account</Link></div>
   </div>:<div className="sidebar-footer">
-   <button className="sidebar-logout" type="button" onClick={()=>setLocation('/login')} data-testid="button-student-logout"><LogOut size={15}/>Log out</button>
-   <span className="sidebar-demo-note">Demo navigation only. Authentication is not connected.</span>
+   <button className="sidebar-logout" type="button" onClick={onLogout} data-testid="button-student-logout"><LogOut size={15}/>Log out</button>
   </div>}
  </aside>
 }
-function AdminSidebar({path}:{path:string}) {
+function AdminSidebar({path, onLogout}:{path:string; onLogout: () => void}) {
  const [,setLocation]=useLocation();
  return <aside className="admin-side dashboard-side admin-side-global" aria-label="Admin dashboard sidebar">
   <DashboardBrand href="/admin"/>
-  <p>Demo administration</p>
+  <p>Administration</p>
   <nav className="sidebar-links" aria-label="Admin dashboard">
    {adminLinks.map(({href,label,icon:Icon})=><Link key={href} href={href} className={path===href?'active':''} data-testid={`admin-nav-${label.toLowerCase()}`}><Icon size={15}/>{label}</Link>)}
   </nav>
   <div className="sidebar-footer">
-   <button className="sidebar-logout" type="button" onClick={()=>setLocation('/login')} data-testid="button-admin-logout"><LogOut size={15}/>Log out</button>
-   <span className="sidebar-demo-note">Demo navigation only. Authentication is not connected.</span>
+   <button className="sidebar-logout" type="button" onClick={onLogout} data-testid="button-admin-logout"><LogOut size={15}/>Log out</button>
   </div>
  </aside>
 }
@@ -170,10 +205,9 @@ function Home(ctx:Context) {
    <form className="hero-search" onSubmit={submit}><input className="field" aria-label="Search opportunities" placeholder="Search role, field or province" value={search} onChange={e=>setSearch(e.target.value)} data-testid="input-home-search"/><button className="button primary" type="submit" data-testid="button-home-search"><Search size={15}/>Search opportunities</button></form>
    <div className="quick-pills" aria-label="Popular searches">{['Internship','Bursary','Learnership','Graduate programme'].map(t=><button key={t} className="pill" onClick={()=>{ctx.track('search',{term:t});setLocation('/explore?q='+encodeURIComponent(t))}} data-testid={`quick-search-${t.toLowerCase().replaceAll(' ','-')}`}>{t}</button>)}</div>
   </div><aside className="hero-aside"><span className="small-label">First, find your fit</span><strong>Search → Discover → Understand → Apply</strong><p>Compare the basics, check the source context, and take your next step with your eyes open.</p></aside></section>
-  <section className="section-block"><div className="section-top"><div><h2>Closing soon</h2><p>Deadlines for these illustrative listings are kept current in this demo.</p></div><Link href="/explore" className="text-link" data-testid="link-closing-explore">Explore all <ArrowRight size={13}/></Link></div><OpportunityGrid items={closing} empty="No currently published samples." /></section>
+  <section className="section-block"><div className="section-top"><div><h2>Closing soon</h2><p>Deadlines for these illustrative listings are kept current.</p></div><Link href="/explore" className="text-link" data-testid="link-closing-explore">Explore all <ArrowRight size={13}/></Link></div><OpportunityGrid items={closing} empty="No currently published samples." /></section>
   <section className="section-block"><div className="section-top"><div><h2>Recently added</h2><p>Sample listings · source details are illustrative and unverified.</p></div><Link href="/explore" className="text-link" data-testid="link-latest-explore">See all <ArrowRight size={13}/></Link></div><OpportunityGrid items={latest}/></section>
   <section className="section-block"><div className="section-top"><div><h2>Browse by province</h2><p>Start with a place that works for you.</p></div></div><div className="quick-pills">{provinces.map(p=><Link key={p} href={`/explore?province=${encodeURIComponent(p)}`} className="pill" data-testid={`province-${p.toLowerCase().replaceAll(' ','-')}`}>{p}</Link>)}</div></section>
-  <section className="section-block notice warning" data-testid="notice-source-trust"><strong>Sample data, clearly labelled.</strong> All employers, listings and source URLs in this prototype are fictional examples and have not been verified. Never pay to apply. Check an organisation independently before sharing personal information.</section>
    <section className="section-block"><div className="section-top"><div><h2>Small guides for the next step</h2><p>Practical preparation, without the jargon.</p></div><Link href="/guides" className="text-link" data-testid="link-guides">All guides <ArrowRight size={13}/></Link></div><div className="guide-grid">{publishedGuides.map((guide,i)=><article className="guide-card" key={guide.id}><span className="guide-index">{String(i+1).padStart(2,'0')}</span><p className="small-label">{guide.category} · {guide.read}</p><h3>{guide.title}</h3><p>{guide.copy}</p><Link href="/guides" className="text-link" data-testid={`guide-preview-${i}`}>Read guide <ArrowRight size={13}/></Link></article>)}</div></section>
  </main>
 }
@@ -242,13 +276,13 @@ function Detail({id,...ctx}:{id:string}&Context) {
    <div className="trust-line"><ShieldAlert size={14}/>{item.sourceStatus}</div>
    <p className="eyebrow" style={{marginTop:20}}>{item.type} · {item.industry}</p><h1 className="detail-title" data-testid="text-detail-title">{item.title}</h1><p className="detail-sub">{item.organisation} · {item.city||item.province} · {item.locationType}</p>
    <div className="card-tags"><span className="tag"><MapPin size={12}/>{item.province}</span><span className="tag">{item.qualification}</span><span className="tag">{item.experience}</span><span className="tag">{item.paidStatus}{item.stipend?` · ${item.stipend}`:''}</span></div>
-   <div className={`notice ${remaining<=3?'warning':''}`} data-testid="text-detail-deadline"><strong>{item.status==='closed'||remaining<0?'This sample is marked closed':remaining===0?'Closes today':`Closes ${new Date(`${item.closingDate}T00:00:00`).toLocaleDateString('en-ZA',{day:'numeric',month:'long',year:'numeric'})}`}.</strong> Listing dates are illustrative and can be edited in the admin demo.</div>
+   <div className={`notice ${remaining<=3?'warning':''}`} data-testid="text-detail-deadline"><strong>{item.status==='closed'||remaining<0?'This sample is marked closed':remaining===0?'Closes today':`Closes ${new Date(`${item.closingDate}T00:00:00`).toLocaleDateString('en-ZA',{day:'numeric',month:'long',year:'numeric'})}`}.</strong> Listing dates are illustrative and can be edited in the admin dashboard.</div>
    <section className="detail-section"><h2>Overview</h2><p>{item.description}</p></section>
    <section className="detail-section"><h2>Requirements</h2><p>{item.requirements||'No requirements supplied.'}</p></section>
    <section className="detail-section"><h2>What you may do</h2><p>{item.responsibilities||'No responsibilities supplied.'}</p></section>
    <section className="detail-section"><h2>Benefits and stipend</h2><p>{item.benefits||'No benefits supplied.'} {item.stipend}</p></section>
    <section className="detail-section"><h2>How to apply</h2><p>{item.howToApply}</p></section>
-   <section className="detail-section"><h2>Source details</h2><p>{item.sourceStatus}. The displayed URL is part of sample data and is not a verified employer application portal.</p><a className="text-link" href={item.sourceUrl} target="_blank" rel="noreferrer" onClick={e=>{e.preventDefault();ctx.announce('Sample source link is not opened in this demo.')}} data-testid="link-source-details">Illustrative source reference <ExternalLink size={13}/></a></section>
+   <section className="detail-section"><h2>Source details</h2><p>{item.sourceStatus}. The displayed URL is part of sample data and is not a verified employer application portal.</p><a className="text-link" href={item.sourceUrl} target="_blank" rel="noreferrer" onClick={e=>{e.preventDefault();ctx.announce('Sample source link is not opened.')}} data-testid="link-source-details">Illustrative source reference <ExternalLink size={13}/></a></section>
    <div className="notice warning" style={{marginTop:20}}><strong>Apply safely.</strong> InternSA never charges application fees. All records on this prototype are fictional samples; no employer has verified them, and no real application will be sent.</div>
    </article><aside className="side-card"><span className="small-label">Your next step</span><h3>{isOpen?'Sign in to apply':'This listing is not open'}</h3><p style={{fontSize:11,color:'#77796f',lineHeight:1.6}}>{isOpen?'You can read the full listing without an account. Log in or create a student account before applying or saving it.':'This listing is closed or unavailable. You can still create an account to save other opportunities.'}</p>
     <div className="auth-required-links detail-auth-links">
@@ -258,7 +292,7 @@ function Detail({id,...ctx}:{id:string}&Context) {
     </div>
    <button className="button" type="button" onClick={share} data-testid="button-share"><Share2 size={15}/>Share / copy link</button>
     <Link className="button" href="/login" data-testid="button-report"><ShieldAlert size={15}/>Log in to report this listing</Link>
-   <div className="side-meta"><div><span>Closing date</span><strong>{new Date(`${item.closingDate}T00:00:00`).toLocaleDateString('en-ZA',{day:'numeric',month:'short',year:'numeric'})}</strong></div><div><span>Source status</span><strong>{item.sourceStatus}</strong></div><div><span>Local demo intents</span><strong>{ctx.store.applyIntents.filter(a=>a.opportunityId===id).length}</strong></div></div>
+   <div className="side-meta"><div><span>Closing date</span><strong>{new Date(`${item.closingDate}T00:00:00`).toLocaleDateString('en-ZA',{day:'numeric',month:'short',year:'numeric'})}</strong></div><div><span>Source status</span><strong>{item.sourceStatus}</strong></div><div><span>Local intents</span><strong>{ctx.store.applyIntents.filter(a=>a.opportunityId===id).length}</strong></div></div>
   </aside></div>
  </main>
 }
@@ -332,7 +366,7 @@ function Applications({store}:Context) {
 function Guides({store}:Context) {
  const published=store.guides.filter(guide=>guide.status==='published');
  return <main className="content">
-  <Heading eyebrow="Career notes" title="A little help, right on time." sub="Short, practical reading to support your next move. Guides are demo content and are not employment or legal advice."/>
+  <Heading eyebrow="Career notes" title="A little help, right on time." sub="Short, practical reading to support your next move. Guides are illustrative content and are not employment or legal advice."/>
   {published.length?<div className="guide-grid">{published.map((guide,index)=><article className="guide-card" key={guide.id} data-testid={`card-guide-${guide.id}`}><span className="guide-index">{String(index+1).padStart(2,'0')}</span><p className="small-label">{guide.category} · {guide.read}</p><h3>{guide.title}</h3><p>{guide.copy}</p><details><summary className="text-link" style={{cursor:'pointer'}} data-testid={`button-open-guide-${guide.id}`}>Read the practical checklist <ChevronDown size={13}/></summary>{guide.checklist.length?<ul style={{fontSize:11,color:'#65675f',lineHeight:1.8,paddingLeft:18,marginTop:10}}>{guide.checklist.map((step,stepIndex)=><li key={`${guide.id}-${stepIndex}`}>{step}</li>)}</ul>:<p style={{fontSize:11,color:'#65675f'}}>Checklist coming soon.</p>}</details></article>)}</div>:<div className="panel" style={{padding:28,textAlign:'center',color:'#77796f',fontSize:12}}>No guides are published yet.</div>}
   <div className="notice warning" style={{marginTop:20}}><strong>Keep your information safe.</strong> Do not share sensitive personal or banking information with an unverified source.</div>
  </main>
@@ -377,10 +411,10 @@ function AdminOverview(ctx:Context) {
  const live=ctx.store.opportunities.filter(isLive),pending=ctx.store.reports.filter(r=>r.status==='open');
  const lastDays=Array.from({length:7},(_,i)=>{const date=new Date();date.setDate(date.getDate()-(6-i));const key=date.toISOString().slice(0,10);return {key,label:date.toLocaleDateString('en',{weekday:'short'}),count:ctx.store.activity.filter(a=>a.kind==='apply'&&a.createdAt.slice(0,10)===key).length}});
  const max=Math.max(1,...lastDays.map(d=>d.count));
- return <main className="content"><Heading eyebrow="Demo admin · Overview" title="A useful view of the demo." sub="Computed from locally stored sample listings and activity. The role switch is not authentication or security." action={<label style={{fontSize:10,fontWeight:700}}>Activity window <select className="select" style={{width:125,marginLeft:7}} value={period} onChange={e=>setPeriod(Number(e.target.value))} data-testid="select-admin-period"><option value={7}>7 days</option><option value={30}>30 days</option><option value={90}>90 days</option></select></label>}/>
+ return <main className="content"><Heading eyebrow="Admin · Overview" title="A useful view of the dashboard." sub="Computed from locally stored sample listings and activity. The role switch is not authentication or security." action={<label style={{fontSize:10,fontWeight:700}}>Activity window <select className="select" style={{width:125,marginLeft:7}} value={period} onChange={e=>setPeriod(Number(e.target.value))} data-testid="select-admin-period"><option value={7}>7 days</option><option value={30}>30 days</option><option value={90}>90 days</option></select></label>}/>
   <div className="admin-content"><div>
-  <div className="metric-grid">{[['Published samples',live.length],['Apply intents',recent.filter(a=>a.kind==='apply').length],['Saved actions',recent.filter(a=>a.kind==='save').length],['Reports to review',pending.length]].map(([label,value],i)=><article className="metric" key={String(label)} data-testid={`metric-${i}`}><span>{label}</span><strong>{value}</strong><small>Local demo records · last {period} days</small></article>)}</div>
-  <section className="panel section-block"><div className="section-top"><div><h2>Apply intent activity</h2><p>Recorded demo intents by day · derived from local activity history</p></div><ActivityIcon size={18} color="#294f81"/></div><div className="chart" role="img" aria-label="Daily demo apply intent counts">{lastDays.map(d=><div className="chart-bar" key={d.key} style={{height:`${Math.max(d.count?12:4,d.count/max*155)}px`}}><strong>{d.count}</strong></div>)}</div><div className="chart-labels">{lastDays.map(d=><span key={d.key}>{d.label}</span>)}</div></section>
+  <div className="metric-grid">{[['Published samples',live.length],['Apply intents',recent.filter(a=>a.kind==='apply').length],['Saved actions',recent.filter(a=>a.kind==='save').length],['Reports to review',pending.length]].map(([label,value],i)=><article className="metric" key={String(label)} data-testid={`metric-${i}`}><span>{label}</span><strong>{value}</strong><small>Local records · last {period} days</small></article>)}</div>
+  <section className="panel section-block"><div className="section-top"><div><h2>Apply intent activity</h2><p>Recorded intents by day · derived from local activity history</p></div><ActivityIcon size={18} color="#294f81"/></div><div className="chart" role="img" aria-label="Daily apply intent counts">{lastDays.map(d=><div className="chart-bar" key={d.key} style={{height:`${Math.max(d.count?12:4,d.count/max*155)}px`}}><strong>{d.count}</strong></div>)}</div><div className="chart-labels">{lastDays.map(d=><span key={d.key}>{d.label}</span>)}</div></section>
   <section className="panel section-block"><div className="section-top"><div><h2>Listing mix</h2><p>Status totals from current saved opportunity records</p></div><Link href="/admin/opportunities" className="text-link" data-testid="link-manage-listings">Manage listings <ArrowRight size={13}/></Link></div><div className="quick-pills">{(['published','draft','closed','archived'] as const).map(status=><span className="tag" key={status}>{status}: {ctx.store.opportunities.filter(o=>o.status===status).length}</span>)}</div></section>
   <section className="section-block notice warning"><strong>Illustrative dashboard, not production analytics.</strong> Counts include seed activity so the prototype has a useful first-run view. New actions, admin changes, and reports update the dashboard locally.</section>
  </div></div></main>
@@ -390,7 +424,7 @@ function AdminOpportunities({store,setStore,announce}:Context) {
  const rows=store.opportunities.filter(o=>`${o.title} ${o.organisation} ${o.type} ${o.province}`.toLowerCase().includes(query.toLowerCase()));
  const save=(item:Opportunity)=>{const exists=store.opportunities.some(o=>o.id===item.id);const complete={...item,id:item.id||makeId(),createdAt:item.createdAt||new Date().toISOString()};setStore(s=>({...s,opportunities:exists?s.opportunities.map(o=>o.id===complete.id?complete:o):[complete,...s.opportunities]}));setCreate(false);setEditing(null);announce(exists?'Listing updated locally.':'Sample listing created locally.');};
  const setStatus=(item:Opportunity,status:Opportunity['status'])=>{setStore(s=>({...s,opportunities:s.opportunities.map(o=>o.id===item.id?{...o,status}:o)}));announce(`Listing ${status}.`);};
- return <main className="content"><Heading eyebrow="Demo admin · Listings" title="Opportunity listings" sub="Create and manage sample records. Changes immediately affect student discovery and analytics." action={<button className="button primary" onClick={()=>setCreate(true)} data-testid="button-create-opportunity"><Plus size={15}/>New sample listing</button>}/>
+ return <main className="content"><Heading eyebrow="Admin · Listings" title="Opportunity listings" sub="Create and manage sample records. Changes immediately affect student discovery and analytics." action={<button className="button primary" onClick={()=>setCreate(true)} data-testid="button-create-opportunity"><Plus size={15}/>New sample listing</button>}/>
   <div className="admin-content"><div><label style={{display:'flex',gap:8,alignItems:'center'}}><Search size={16}/><input className="field" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search listings" aria-label="Search admin listings" data-testid="input-admin-search"/></label>
   <div className="table-wrap section-block"><table><thead><tr><th>Opportunity</th><th>Location</th><th>Closing</th><th>Status</th><th>Actions</th></tr></thead><tbody>{rows.map(item=><tr key={item.id} data-testid={`row-admin-opportunity-${item.id}`}><td><strong>{item.title}</strong><br/><span style={{color:'#888',fontSize:9}}>{item.organisation}</span></td><td>{item.city||item.province}</td><td>{item.closingDate}</td><td><span className={`status-badge ${item.status}`}>{item.status}</span></td><td><div className="table-actions"><button className="button small" onClick={()=>setEditing(item)} aria-label={`Edit ${item.title}`} data-testid={`button-edit-${item.id}`}><Pencil size={12}/>Edit</button>{item.status!=='published'&&<button className="button small" onClick={()=>setStatus(item,'published')} data-testid={`button-publish-${item.id}`}>Publish</button>}{item.status==='published'&&<button className="button small" onClick={()=>setStatus(item,'closed')} data-testid={`button-close-${item.id}`}>Close</button>}{item.status!=='archived'&&<button className="button small" onClick={()=>setStatus(item,'archived')} aria-label={`Archive ${item.title}`} data-testid={`button-archive-${item.id}`}><Archive size={12}/></button>}</div></td></tr>)}</tbody></table>{rows.length===0&&<div style={{padding:24,textAlign:'center',fontSize:12,color:'#777'}}>No matching listing. Clear the search or create a new sample.</div>}</div></div></div>
   {(create||editing)&&<Dialog title={create?'Create a sample listing':'Edit sample listing'} close={()=>{setCreate(false);setEditing(null)}}><OpportunityForm initial={editing||emptyOpportunity()} onSave={save} onCancel={()=>{setCreate(false);setEditing(null)}}/></Dialog>}
@@ -409,7 +443,7 @@ function AdminGuides({store,setStore,announce}:Context) {
   setStore(current=>({...current,guides:current.guides.map(item=>item.id===guide.id?{...item,status}:item)}));
   announce(status==='published'?'Guide published and visible to students.':status==='draft'?'Guide moved to draft and hidden from students.':'Guide archived and hidden from students.');
  };
- return <main className="content"><Heading eyebrow="Demo admin · Learning" title="Guides" sub="Create and manage practical reading for students. Published guides appear on the public Guides page and landing-page previews." action={<button className="button primary" onClick={()=>setCreate(true)} data-testid="button-create-guide"><Plus size={15}/>New guide</button>}/>
+ return <main className="content"><Heading eyebrow="Admin · Learning" title="Guides" sub="Create and manage practical reading for students. Published guides appear on the public Guides page and landing-page previews." action={<button className="button primary" onClick={()=>setCreate(true)} data-testid="button-create-guide"><Plus size={15}/>New guide</button>}/>
   <div className="admin-content"><div><label style={{display:'flex',gap:8,alignItems:'center'}}><Search size={16}/><input className="field" value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search guides" aria-label="Search admin guides" data-testid="input-admin-guide-search"/></label>
    <div className="table-wrap section-block"><table><thead><tr><th>Guide</th><th>Category</th><th>Reading time</th><th>Status</th><th>Actions</th></tr></thead><tbody>{rows.map(guide=><tr key={guide.id} data-testid={`row-admin-guide-${guide.id}`}><td><strong>{guide.title}</strong><br/><span style={{color:'#888',fontSize:9}}>{guide.copy}</span></td><td>{guide.category}</td><td>{guide.read}</td><td><span className={`status-badge ${guide.status}`}>{guide.status}</span></td><td><div className="table-actions"><button className="button small" onClick={()=>setEditing(guide)} aria-label={`Edit ${guide.title}`} data-testid={`button-edit-guide-${guide.id}`}><Pencil size={12}/>Edit</button>{guide.status==='published'?<button className="button small" onClick={()=>setStatus(guide,'draft')} data-testid={`button-unpublish-guide-${guide.id}`}>Unpublish</button>:<button className="button small" onClick={()=>setStatus(guide,'published')} data-testid={`button-publish-guide-${guide.id}`}>Publish</button>}{guide.status!=='archived'&&<button className="button small" onClick={()=>setStatus(guide,'archived')} aria-label={`Archive ${guide.title}`} data-testid={`button-archive-guide-${guide.id}`}><Archive size={12}/></button>}</div></td></tr>)}</tbody></table>{rows.length===0&&<div style={{padding:24,textAlign:'center',fontSize:12,color:'#77796f'}}>No matching guides. Clear the search or create a new guide.</div>}</div>
   </div></div>
@@ -418,9 +452,9 @@ function AdminGuides({store,setStore,announce}:Context) {
 }
 function AdminReports({store,setStore,announce}:Context) {
  const reports=[...store.reports].sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
- const resolve=(id:string)=>{setStore(s=>({...s,reports:s.reports.map(r=>r.id===id?{...r,status:'resolved'}:r)}));announce('Report marked resolved in local demo.');};
- return <main className="content"><Heading eyebrow="Demo admin · Moderation" title="Report review" sub="Reports submitted from opportunity details appear here for local review."/><div className="admin-content"><div>
-  {reports.length===0?<div className="panel" style={{textAlign:'center',padding:38}}><ShieldCheck size={26} color="#507455"/><h2 style={{fontFamily:'Newsreader',margin:'12px 0 5px'}}>No reports to review</h2><p style={{color:'#77796f',fontSize:12}}>When a student flags a sample listing, it will be added to this queue.</p><Link href="/explore" className="button" data-testid="link-review-explore">Browse sample listings</Link></div>:<div className="table-wrap"><table><thead><tr><th>Listing</th><th>Reason</th><th>Details</th><th>Reported</th><th>Status</th><th></th></tr></thead><tbody>{reports.map(r=>{const opportunity=store.opportunities.find(o=>o.id===r.opportunityId);return <tr key={r.id} data-testid={`row-report-${r.id}`}><td><strong>{opportunity?.title||'Listing removed'}</strong></td><td>{r.reason}</td><td>{r.details||'—'}</td><td>{new Date(r.createdAt).toLocaleDateString()}</td><td><span className={`status-badge ${r.status==='resolved'?'closed':'draft'}`}>{r.status}</span></td><td>{r.status==='open'&&<button className="button small" onClick={()=>resolve(r.id)} data-testid={`button-resolve-${r.id}`}><Check size={12}/>Resolve</button>}</td></tr>})}</tbody></table></div>}
+ const resolve=(id:string)=>{setStore(s=>({...s,reports:s.reports.map(r=>r.id===id?{...r,status:'resolved'}:r)}));announce('Report marked resolved.');};
+ return <main className="content"><Heading eyebrow="Admin · Moderation" title="Report review" sub="Reports submitted from opportunity details appear here for local review."/><div className="admin-content"><div>
+  {reports.length===0?<div className="panel" style={{textAlign:'center',padding:38}}><ShieldCheck size={26} color="#507455"/><h2 style={{fontFamily:'Newsreader',margin:'12px 0 5px'}}>No reports to review</h2><p style={{color:'#77796f',fontSize:12}}>When a student flags a listing, it will be added to this queue.</p><Link href="/explore" className="button" data-testid="link-review-explore">Browse listings</Link></div>:<div className="table-wrap"><table><thead><tr><th>Listing</th><th>Reason</th><th>Details</th><th>Reported</th><th>Status</th><th></th></tr></thead><tbody>{reports.map(r=>{const opportunity=store.opportunities.find(o=>o.id===r.opportunityId);return <tr key={r.id} data-testid={`row-report-${r.id}`}><td><strong>{opportunity?.title||'Listing removed'}</strong></td><td>{r.reason}</td><td>{r.details||'—'}</td><td>{new Date(r.createdAt).toLocaleDateString()}</td><td><span className={`status-badge ${r.status==='resolved'?'closed':'draft'}`}>{r.status}</span></td><td>{r.status==='open'&&<button className="button small" onClick={()=>resolve(r.id)} data-testid={`button-resolve-${r.id}`}><Check size={12}/>Resolve</button>}</td></tr>})}</tbody></table></div>}
  </div></div></main>
 }
 function AdminAnalytics({store}:Context) {
@@ -431,10 +465,10 @@ function AdminAnalytics({store}:Context) {
  const daily=Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(6-i));const date=d.toISOString().slice(0,10);return {date,label:d.toLocaleDateString('en',{weekday:'short'}),count:actions.filter(a=>a.createdAt.slice(0,10)===date).length}});
  const max=Math.max(1,...daily.map(d=>d.count));
  const searchTerms=Object.entries(actions.filter(a=>a.kind==='search'&&a.term).reduce<Record<string,number>>((acc,a)=>{const term=(a.term||'').toLowerCase();acc[term]=(acc[term]||0)+1;return acc},{})).sort((a,b)=>b[1]-a[1]).slice(0,5);
- return <main className="content"><Heading eyebrow="Demo admin · Analytics" title="What people are exploring." sub="Local activity only. Counts are derived from demo records and actions; no user-level personal data is collected." action={<label style={{fontSize:10,fontWeight:700}}>Range <select className="select" style={{width:130,marginLeft:7}} value={period} onChange={e=>setPeriod(Number(e.target.value))} data-testid="select-analytics-period"><option value={7}>7 days</option><option value={30}>30 days</option><option value={90}>90 days</option></select></label>}/>
+ return <main className="content"><Heading eyebrow="Admin · Analytics" title="What people are exploring." sub="Local activity only. Counts are derived from records and actions; no user-level personal data is collected." action={<label style={{fontSize:10,fontWeight:700}}>Range <select className="select" style={{width:130,marginLeft:7}} value={period} onChange={e=>setPeriod(Number(e.target.value))} data-testid="select-analytics-period"><option value={7}>7 days</option><option value={30}>30 days</option><option value={90}>90 days</option></select></label>}/>
  <div className="admin-content"><div><div className="metric-grid">{counts.map((x,i)=><article className="metric" key={x.kind} data-testid={`analytics-metric-${x.kind}`}><span>{x.kind.charAt(0).toUpperCase()+x.kind.slice(1)} events</span><strong>{x.count}</strong><small>Selected period · {period} days</small></article>)}</div>
  <section className="panel section-block"><div className="section-top"><div><h2>Activity timeline</h2><p>All local events per day, filtered below.</p></div><select className="select" style={{width:135}} value={kind} onChange={e=>setKind(e.target.value)} aria-label="Filter activity type" data-testid="select-analytics-kind"><option value="all">All activity</option>{typesOfAction.map(k=><option key={k} value={k}>{k}</option>)}</select></div><div className="chart">{daily.map(d=><div key={d.date} className="chart-bar" style={{height:`${Math.max(d.count?12:4,d.count/max*155)}px`}}><strong>{d.count}</strong></div>)}</div><div className="chart-labels">{daily.map(d=><span key={d.date}>{d.label}</span>)}</div></section>
- <section className="panel section-block"><div className="section-top"><div><h2>Search terms</h2><p>Based on searches recorded in local demo activity.</p></div></div>{searchTerms.length?<div className="quick-pills">{searchTerms.map(([term,count])=><span className="tag" key={term}>{term} · {count}</span>)}</div>:<p style={{fontSize:12,color:'#77796f'}}>No search activity in this range yet. Search Explore to add events.</p>}</section>
+ <section className="panel section-block"><div className="section-top"><div><h2>Search terms</h2><p>Based on searches recorded in local activity.</p></div></div>{searchTerms.length?<div className="quick-pills">{searchTerms.map(([term,count])=><span className="tag" key={term}>{term} · {count}</span>)}</div>:<p style={{fontSize:12,color:'#77796f'}}>No search activity in this range yet. Search Explore to add events.</p>}</section>
  <section className="section-block notice"><strong>Interpret with care.</strong> This dashboard is a prototype and uses a small set of seeded illustrative activities plus actions made in this browser.</section>
  </div></div></main>
 }
