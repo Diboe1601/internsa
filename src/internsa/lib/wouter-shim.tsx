@@ -30,7 +30,7 @@ type LinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
 
 export function Link({ href, children, ...rest }: LinkProps) {
   return (
-    <TanStackLink to={href} {...(rest as Record<string, unknown>)}>
+    <TanStackLink to={href} activeProps={{}} {...(rest as Record<string, unknown>)}>
       {children}
     </TanStackLink>
   );
