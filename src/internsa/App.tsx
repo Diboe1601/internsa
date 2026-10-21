@@ -100,6 +100,7 @@ function Heading({eyebrow,title,sub,action}:{eyebrow:string;title:string;sub?:st
 }
 function DashboardBrand({href}:{href:string}) {return <Link href={href} className="dashboard-brand" data-testid="link-dashboard-brand"><span className="brand-mark">i</span><span className="brand-word">internsa<small>YOUR NEXT STEP</small></span></Link>}
 function StudentSidebar({path}:{path:string}) {
+ const [,setLocation]=useLocation();
  const links=linksFor(path);
  return <aside className="admin-side dashboard-side student-side" aria-label="Student dashboard sidebar">
   <DashboardBrand href="/"/>
@@ -108,7 +109,7 @@ function StudentSidebar({path}:{path:string}) {
    {links.map(({href,label,icon:Icon})=><Link key={href} href={href} className={path===href?'active':''} data-testid={`student-nav-${label.toLowerCase().replaceAll(' ','-')}`}><Icon size={16}/>{label}</Link>)}
   </nav>
   <div className="sidebar-footer">
-   <div className="sidebar-account-links"><Link href="/login" data-testid="sidebar-student-login">Log in</Link><Link href="/signup" data-testid="sidebar-student-signup">Create account</Link></div>
+   <button className="sidebar-logout" type="button" onClick={()=>setLocation('/login')} data-testid="button-student-logout"><LogOut size={15}/>Log out</button>
    <span className="sidebar-demo-note">Demo navigation only. Authentication is not connected.</span>
   </div>
  </aside>
@@ -122,9 +123,8 @@ function AdminSidebar({path}:{path:string}) {
    {adminLinks.map(({href,label,icon:Icon})=><Link key={href} href={href} className={path===href?'active':''} data-testid={`admin-nav-${label.toLowerCase()}`}><Icon size={15}/>{label}</Link>)}
   </nav>
   <div className="sidebar-footer">
-   <button className="sidebar-view" type="button" onClick={()=>setLocation('/')} data-testid="button-demo-role"><House size={14}/>Student view</button>
    <button className="sidebar-logout" type="button" onClick={()=>setLocation('/login')} data-testid="button-admin-logout"><LogOut size={15}/>Log out</button>
-   <span className="sidebar-demo-note">Role switching is a local demo convenience, not authentication or access security.</span>
+   <span className="sidebar-demo-note">Demo navigation only. Authentication is not connected.</span>
   </div>
  </aside>
 }
