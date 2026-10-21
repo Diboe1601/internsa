@@ -109,7 +109,9 @@ function StudentSidebar({path}:{path:string}) {
   <nav className="sidebar-links" aria-label="Student dashboard">
    {links.map(({href,label,icon:Icon})=><Link key={href} href={href} className={path===href?'active':''} data-testid={`student-nav-${label.toLowerCase().replaceAll(' ','-')}`}><Icon size={16}/>{label}</Link>)}
   </nav>
-  {publicPaths.includes(path)?null:<div className="sidebar-footer">
+  {publicPaths.includes(path)?<div className="sidebar-footer">
+   <div className="sidebar-account-links"><Link href="/login" data-testid="link-sidebar-login">Log in</Link><Link href="/signup" data-testid="link-sidebar-signup">Create account</Link></div>
+  </div>:<div className="sidebar-footer">
    <button className="sidebar-logout" type="button" onClick={()=>setLocation('/login')} data-testid="button-student-logout"><LogOut size={15}/>Log out</button>
    <span className="sidebar-demo-note">Demo navigation only. Authentication is not connected.</span>
   </div>}
