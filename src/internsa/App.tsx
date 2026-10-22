@@ -25,7 +25,7 @@ const studentLinks=[
   {href:'/guides',label:'Career guides',icon:BookOpen},{href:'/profile',label:'Profile',icon:UserRound},
 ];
 const publicPaths=['/','/explore','/guides'];
-const linksFor=(path:string)=>publicPaths.includes(path)?publicLinks:studentLinks;
+const linksFor=(path:string,authed:boolean)=>authed?studentLinks:publicPaths.includes(path)?publicLinks:studentLinks;
 const adminLinks = [
   {href:'/admin',label:'Overview',icon:LayoutDashboard},{href:'/admin/opportunities',label:'Opportunities',icon:BriefcaseBusiness},
   {href:'/admin/guides',label:'Guides',icon:BookOpen},
