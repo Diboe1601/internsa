@@ -115,7 +115,7 @@ export const types = ['Internship', 'Graduate programme', 'Entry-level job', 'Le
 export const emptyOpportunity = (): Opportunity => ({
   id: '', title: '', organisation: 'Illustrative · ', type: 'Internship', province: 'Gauteng', city: '',
   locationType: 'On-site', industry: 'Other', qualification: 'Any qualification', experience: 'No experience',
-  paidStatus: 'Not specified', stipend: '', closingDate: new Date().toISOString().split('T')[0],
+  paidStatus: 'Not specified', stipend: '', closingDate: new Date().toISOString().slice(0, 10),
   description: '', requirements: '', responsibilities: '', benefits: '', howToApply: '',
   sourceUrl: 'https://example.org/illustrative-listing', sourceStatus: 'Illustrative source · not verified',
   status: 'draft', createdAt: new Date().toISOString(), featured: false
