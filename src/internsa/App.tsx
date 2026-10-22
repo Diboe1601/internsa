@@ -25,7 +25,7 @@ const studentLinks=[
   {href:'/guides',label:'Career guides',icon:BookOpen},{href:'/profile',label:'Profile',icon:UserRound},
 ];
 const publicPaths=['/','/explore','/guides'];
-const linksFor=(path:string)=>publicPaths.includes(path)?publicLinks:studentLinks;
+const linksFor=(path:string,authed:boolean)=>authed?studentLinks:publicPaths.includes(path)?publicLinks:studentLinks;
 const adminLinks = [
   {href:'/admin',label:'Overview',icon:LayoutDashboard},{href:'/admin/opportunities',label:'Opportunities',icon:BriefcaseBusiness},
   {href:'/admin/guides',label:'Guides',icon:BookOpen},
@@ -106,7 +106,7 @@ function AppShell() {
       </Switch>
     </>:<>
      return <div className={`dashboard-shell ${isAdmin?'admin-dashboard-shell':'student-dashboard-shell'}`}>
-        {isAdmin?<AdminSidebar path={location} onLogout={handleLogout}/>:<StudentSidebar path={location} onLogout={handleLogout}/>}
+        {isAdmin?<AdminSidebar path={location} onLogout={handleLogout}/>:<StudentSidebar path={location} authed={!!user} onLogout={handleLogout}/>}
         <div className="dashboard-main">
           <Switch>
             <Route path="/">{()=><Home {...ctx}/>}</Route>
@@ -127,7 +127,7 @@ function AppShell() {
           </Switch>
         </div>
       </div>
-      {isAdmin?<AdminNav path={location}/>:<BottomNav path={location}/>}
+      {isAdmin?<AdminNav path={location}/>:<BottomNav path={location} authed={!!user}/>}
     </>}
     {toast&&<div className="toast" role="status" data-testid="status-toast">{toast}</div>}
   </div>;
@@ -138,18 +138,18 @@ function Heading({eyebrow,title,sub,action}:{eyebrow:string;title:string;sub?:st
  return <div className="page-heading"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1>{sub&&<p>{sub}</p>}</div>{action}</div>
 }
 function DashboardBrand({href}:{href:string}) {return <Link href={href} className="dashboard-brand" data-testid="link-dashboard-brand"><span className="brand-mark">i</span><span className="brand-word">internsa<small>YOUR NEXT STEP</small></span></Link>}
-function StudentSidebar({path, onLogout}:{path:string; onLogout: () => void}) {
+function StudentSidebar({path, authed, onLogout}:{path:string; authed:boolean; onLogout: () => void}) {
  const [,setLocation]=useLocation();
- const links=linksFor(path);
+ const links=linksFor(path,authed);
  return <aside className="admin-side dashboard-side student-side" aria-label="Student dashboard sidebar">
   <DashboardBrand href="/"/>
   <nav className="sidebar-links" aria-label="Student dashboard">
    {links.map(({href,label,icon:Icon})=><Link key={href} href={href} className={path===href?'active':''} data-testid={`student-nav-${label.toLowerCase().replaceAll(' ','-')}`}><Icon size={16}/>{label}</Link>)}
   </nav>
-  {publicPaths.includes(path)?<div className="sidebar-footer">
-   <div className="sidebar-account-links"><Link href="/login" data-testid="link-sidebar-login">Log in</Link><Link href="/signup" data-testid="link-sidebar-signup">Create account</Link></div>
-  </div>:<div className="sidebar-footer">
+  {authed?<div className="sidebar-footer">
    <button className="sidebar-logout" type="button" onClick={onLogout} data-testid="button-student-logout"><LogOut size={15}/>Log out</button>
+  </div>:<div className="sidebar-footer">
+    <div className="sidebar-account-links"><Link href="/login" data-testid="link-sidebar-login">Log in</Link><Link href="/signup" data-testid="link-sidebar-signup">Create account</Link></div>
   </div>}
  </aside>
 }
@@ -166,12 +166,14 @@ function AdminSidebar({path, onLogout}:{path:string; onLogout: () => void}) {
   </div>
  </aside>
 }
-function BottomNav({path}:{path:string}) {
- const links=linksFor(path);
+function BottomNav({path, authed}:{path:string; authed:boolean}) {
+ const links=linksFor(path,authed);
  return <nav className="bottom-nav" aria-label="Student dashboard navigation">
   {links.map(({href,label,icon:Icon})=><Link key={href} href={href} className={path===href?'active':''} data-testid={`mobile-nav-${label.toLowerCase()}`}><Icon size={17}/><span>{label}</span></Link>)}
-  <Link href="/login" data-testid="mobile-nav-login"><ArrowLeft size={17}/><span>Log in</span></Link>
+  {!authed&&<>
+   <Link href="/login" data-testid="mobile-nav-login"><ArrowLeft size={17}/><span>Log in</span></Link>
    <Link href="/signup" data-testid="mobile-nav-signup"><Plus size={17}/><span>Sign up</span></Link>
+  </>}
  </nav>
 }
 function AdminNav({path}:{path:string}) {

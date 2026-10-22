@@ -115,7 +115,7 @@ export const types = ['Internship', 'Graduate programme', 'Entry-level job', 'Le
 export const emptyOpportunity = (): Opportunity => ({
   id: '', title: '', organisation: 'Illustrative · ', type: 'Internship', province: 'Gauteng', city: '',
   locationType: 'On-site', industry: 'Other', qualification: 'Any qualification', experience: 'No experience',
-  paidStatus: 'Not specified', stipend: '', closingDate: new Date().toISOString().split('T')[0],
+  paidStatus: 'Not specified', stipend: '', closingDate: new Date().toISOString().slice(0, 10),
   description: '', requirements: '', responsibilities: '', benefits: '', howToApply: '',
   sourceUrl: 'https://example.org/illustrative-listing', sourceStatus: 'Illustrative source · not verified',
   status: 'draft', createdAt: new Date().toISOString(), featured: false
@@ -142,31 +142,45 @@ export function isLive(item: Opportunity) {
 }
 
 // --- Supabase Data Fetching ---
+// Database columns are snake_case (created_at, closing_date, ...); the app uses camelCase.
+// Convert on every read/write so rows round-trip correctly.
+
+const camelize = (row: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(row).map(([key, value]) => [
+    key.replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase()),
+    value,
+  ]));
+
+const snakeify = (row: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(row).map(([key, value]) => [
+    key.replace(/[A-Z0-9]/g, (c) => (/[A-Z]/.test(c) ? `_${c.toLowerCase()}` : `_${c}`)),
+    value,
+  ]));
 
 export async function fetchOpportunities(): Promise<Opportunity[]> {
   const { data, error } = await supabase
     .from('opportunities')
     .select('*')
-    .order('createdAt', { ascending: false });
+    .order('created_at', { ascending: false });
 
   if (error) {
     console.error('Error fetching opportunities:', error);
     return [];
   }
-  return data || [];
+  return ((data || []) as Record<string, unknown>[]).map((row) => camelize(row) as unknown as Opportunity);
 }
 
 export async function fetchGuides(): Promise<Guide[]> {
   const { data, error } = await supabase
     .from('guides')
     .select('*')
-    .order('createdAt', { ascending: false });
+    .order('created_at', { ascending: false });
 
   if (error) {
     console.error('Error fetching guides:', error);
     return [];
   }
-  return data || [];
+  return ((data || []) as Record<string, unknown>[]).map((row) => camelize(row) as unknown as Guide);
 }
 
 export async function fetchProfile(userId: string): Promise<Profile | null> {
@@ -180,13 +194,13 @@ export async function fetchProfile(userId: string): Promise<Profile | null> {
     console.error('Error fetching profile:', error);
     return null;
   }
-  return data;
+  return data ? (camelize(data as Record<string, unknown>) as unknown as Profile) : null;
 }
 
 export async function updateProfile(profile: Profile) {
   const { error } = await supabase
     .from('profiles')
-    .upsert(profile);
+    .upsert(snakeify(profile as unknown as Record<string, unknown>));
 
   if (error) console.error('Error updating profile:', error);
 }
@@ -194,7 +208,7 @@ export async function updateProfile(profile: Profile) {
 export async function trackActivity(activity: Omit<Activity, 'id' | 'createdAt'>) {
   const { error } = await supabase
     .from('activities')
-    .insert([{ ...activity, id: makeId(), createdAt: new Date().toISOString() }]);
+    .insert([snakeify({ ...activity, id: makeId(), createdAt: new Date().toISOString() })]);
 
   if (error) console.error('Error tracking activity:', error);
 }
