@@ -106,7 +106,7 @@ function AppShell() {
       </Switch>
     </>:<>
      return <div className={`dashboard-shell ${isAdmin?'admin-dashboard-shell':'student-dashboard-shell'}`}>
-        {isAdmin?<AdminSidebar path={location} onLogout={handleLogout}/>:<StudentSidebar path={location} onLogout={handleLogout}/>}
+        {isAdmin?<AdminSidebar path={location} onLogout={handleLogout}/>:<StudentSidebar path={location} authed={!!user} onLogout={handleLogout}/>}
         <div className="dashboard-main">
           <Switch>
             <Route path="/">{()=><Home {...ctx}/>}</Route>
@@ -127,7 +127,7 @@ function AppShell() {
           </Switch>
         </div>
       </div>
-      {isAdmin?<AdminNav path={location}/>:<BottomNav path={location}/>}
+      {isAdmin?<AdminNav path={location}/>:<BottomNav path={location} authed={!!user}/>}
     </>}
     {toast&&<div className="toast" role="status" data-testid="status-toast">{toast}</div>}
   </div>;
